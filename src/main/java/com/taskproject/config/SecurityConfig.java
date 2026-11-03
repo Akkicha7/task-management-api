@@ -31,19 +31,35 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+            // ── CSRF ────────────────────────────────────────────────────────
+            // This is a stateless REST API authenticated via JWT Bearer tokens,
+            // not browser session cookies, so CSRF protection is not applicable.
             .csrf(csrf -> csrf.disable())
-            .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // ── Frame options ────────────────────────────────────────────────
+            // Allow the H2 console (which uses frames) to load from the same origin.
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.sameOrigin())
+            )
+            // ── Session ──────────────────────────────────────────────────────
+            .sessionManagement(sess -> sess
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            // ── Exception handling ───────────────────────────────────────────
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(authenticationEntryPoint)
-                .accessDeniedHandler(accessDeniedHandler))
+                .accessDeniedHandler(accessDeniedHandler)
+            )
+            // ── Authorization ────────────────────────────────────────────────
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/api/auth/**",
-                    "/swagger-ui/**",
+                    "/api/auth/**",       // public auth endpoints
+                    "/swagger-ui/**",     // Swagger UI static files
                     "/swagger-ui.html",
-                    "/v3/api-docs/**"
+                    "/v3/api-docs/**",    // OpenAPI spec
+                    "/h2-console/**"      // H2 web console (dev only)
                 ).permitAll()
-                .anyRequest().authenticated())
+                .anyRequest().authenticated()
+            )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
